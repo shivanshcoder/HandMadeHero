@@ -1,5 +1,7 @@
 #include<Windows.h>
 #include<stdint.h>
+#include<Xinput.h>
+
 #define global_variable static;
 #define local_persist static;
 
@@ -20,6 +22,41 @@ struct WindowDimension {
 	int Width;
 	int Height;
 };
+
+//GetState
+#define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
+
+typedef X_INPUT_GET_STATE (x_input_get_state);
+
+X_INPUT_GET_STATE (XInputGetStateStub) {
+	return 0;
+}
+
+global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
+
+#define XInputGetState XInputGetState_
+
+
+//SetState
+#define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+typedef X_INPUT_SET_STATE (x_input_set_state);
+
+X_INPUT_SET_STATE (XInputSetStateStub) {
+	return 0;
+}
+global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
+
+#define XInputSetState XInputSetState_
+
+
+
+void Win32LoadXInput (void) {
+	HMODULE XInputLibrary = LoadLibraryA ("xinput1_3.dll");
+	if (XInputLibrary) {
+		XInputGetState = (x_input_get_state *)GetProcAddress (XInputLibrary, "XInputGetState");
+
+	}
+}
 
 WindowDimension GetWinDimension (HWND Window) {
 	WindowDimension Result;
@@ -119,7 +156,7 @@ static void WinResizeDIBSection (Offscreen_Buffer *Buffer, int Width, int Height
 
 }
 
-void UpdateWin (Offscreen_Buffer Buffer, HDC DeviceContext, int WindowWidth, int WindowHeight, int X, int Y/*, int Width, int Height*/) {
+void UpdateWin (Offscreen_Buffer *Buffer, HDC DeviceContext, int WindowWidth, int WindowHeight, int X, int Y/*, int Width, int Height*/) {
 
 	StretchDIBits (DeviceContext,
 
@@ -127,9 +164,9 @@ void UpdateWin (Offscreen_Buffer Buffer, HDC DeviceContext, int WindowWidth, int
 		0, 0, WindowWidth, WindowHeight,
 
 		//BufferWidth remains same
-		0, 0, Buffer.Width, Buffer.Height,
+		0, 0, Buffer->Width, Buffer->Height,
 
-		Buffer.Memory, &Buffer.Info, DIB_RGB_COLORS, SRCCOPY);
+		Buffer->Memory, &Buffer->Info, DIB_RGB_COLORS, SRCCOPY);
 }
 
 LRESULT CALLBACK MainProc (HWND Window, UINT Message, WPARAM wParam, LPARAM lParam) {
@@ -148,13 +185,74 @@ LRESULT CALLBACK MainProc (HWND Window, UINT Message, WPARAM wParam, LPARAM lPar
 
 
 		WindowDimension Dimension = GetWinDimension (Window);
-		UpdateWin (BackBuffer, DeviceContext, Dimension.Width, Dimension.Height, X, Y/*, Width, Height*/);
+		UpdateWin (&BackBuffer, DeviceContext, Dimension.Width, Dimension.Height, X, Y/*, Width, Height*/);
 
 		EndPaint (Window, &Paint);
 
 	}break;
 
+	case WM_SYSKEYDOWN:
+	case WM_SYSKEYUP:
+	case WM_KEYDOWN:
+	case WM_KEYUP: {
+		uint32_t VKCode = wParam;
+		bool WasDown = ((lParam & (1 << 30)) != 0);
+		bool IsDown = ((lParam & (1 << 31)) == 0);
+		if (IsDown != WasDown) {
+			switch (VKCode) {
+			case 'W': {
 
+			}break;
+
+			case 'A': {
+			}break;
+
+			case 'S': {
+
+			}break;
+
+			case 'D': {
+
+			}break;
+
+			case 'E': {
+
+			}break;
+
+			case 'Q': {
+
+			}break;
+
+			case VK_UP: {
+
+			}break;
+
+			case VK_DOWN: {
+
+			}break;
+
+			case VK_LEFT: {
+
+			}break;
+
+			case VK_RIGHT: {
+
+			}break;
+
+			case VK_ESCAPE: {
+				if (IsDown)
+					OutputDebugStringA ("Escape is down\n");;
+				if (WasDown)
+					OutputDebugStringA ("Escape was down\n");
+			}break;
+
+			case VK_SPACE: {
+
+			}break;
+
+			}
+		}
+	}break;
 	case WM_DESTROY: {
 		PostQuitMessage (0);
 		return 0;
@@ -171,18 +269,18 @@ LRESULT CALLBACK MainProc (HWND Window, UINT Message, WPARAM wParam, LPARAM lPar
 
 int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, int CmdShow) {
 	
-	WNDCLASS WindowClass = {};
+	WNDCLASSA WindowClass = {};
 
 	WinResizeDIBSection (&BackBuffer, 1280, 720);
 
 	WindowClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;;
 	WindowClass.lpfnWndProc = MainProc;
 	WindowClass.hInstance = Instance;
-	WindowClass.lpszClassName = TEXT ("HandMadeHero");
+	WindowClass.lpszClassName = "HandMadeHero";
 
-	RegisterClass (&WindowClass);
+	RegisterClassA (&WindowClass);
 
-	HWND Window = CreateWindowEx (0, WindowClass.lpszClassName, TEXT ("HandMadeHero"), WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+	HWND Window = CreateWindowExA (0, WindowClass.lpszClassName, "HandMadeHero", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, Instance, 0);
 	Running = true;
 
@@ -202,12 +300,45 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 			DispatchMessage (&Message);
 
 		}
+
+		for (DWORD ControllerIndex = 0; ControllerIndex < XUSER_MAX_COUNT; ++ControllerIndex) {
+			XINPUT_STATE ControllerState;
+			if ( XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS) {
+
+				//TODO: See if COntrollerState.dwPacketNumber is increments too rapidly
+				XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
+				
+				bool Up = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+				bool Down = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+				bool Left = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+				bool Right = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+				
+				bool Start = (Pad->wButtons & XINPUT_GAMEPAD_START);
+				bool Back = (Pad->wButtons & XINPUT_GAMEPAD_BACK);
+
+				bool LeftShoulder = (Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
+				bool RightShoulder = (Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+			
+				bool AButton = (Pad->wButtons & XINPUT_GAMEPAD_A);
+				bool BButton = (Pad->wButtons & XINPUT_GAMEPAD_B);
+				bool XButton = (Pad->wButtons & XINPUT_GAMEPAD_X); 
+				bool YButton = (Pad->wButtons & XINPUT_GAMEPAD_Y);
+
+				int16_t StickX = Pad->sThumbLX;
+				int16_t StickY = Pad->sThumbLY;
+			}
+			else {
+
+
+			}
+		}
+
 		RenderGradient (&BackBuffer, xOffset, yOffset);
 		
 
 		WindowDimension Dimension = GetWinDimension (Window);
 
-		UpdateWin (BackBuffer, DeviceContext, Dimension.Width, Dimension.Height, 0, 0/*,Dimension.Width,Dimension.Height*/);
+		UpdateWin (&BackBuffer, DeviceContext, Dimension.Width, Dimension.Height, 0, 0/*,Dimension.Width,Dimension.Height*/);
 		//ReleaseDC (Window, DeviceContext);
 		xOffset++;
 		yOffset++;
