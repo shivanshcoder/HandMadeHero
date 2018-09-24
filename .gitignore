@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+/HandMadeHero/x64/Debug
+/x64/Debug
+/.vs/HandMadeHero/v15/Browse.VC.opendb
+/.vs/HandMadeHero/v15/Browse.VC.db
