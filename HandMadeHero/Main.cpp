@@ -19,6 +19,7 @@ struct Offscreen_Buffer {
 };
 
 static Offscreen_Buffer BackBuffer;
+global_variable LPDIRECTSOUNDBUFFER SecondaryBuffer;
 
 struct WindowDimension {
 	int Width;
@@ -143,7 +144,7 @@ static void InitDSound(HWND Window, int32_t SamplesPerSecond, int32_t BufferSize
 			BufferDescription.dwBufferBytes = BufferSize;
 			BufferDescription.lpwfxFormat = &WaveFormat;
 
-			LPDIRECTSOUNDBUFFER SecondaryBuffer;
+			//LPDIRECTSOUNDBUFFER SecondaryBuffer;
 
 			if (SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, 0))) {
 				OutputDebugStringA("Secondary Buffer Created succesfully");
@@ -397,14 +398,37 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, Instance, 0);
 	
 	if (Window) {
+		//For Quitting
 		Running = true;
 
+		//For Graphics
 		int xOffset = 0;
 		int yOffset = 0;
 
-		HDC DeviceContext = GetDC(Window);
 
-		InitDSound(Window, 48000, 48000 * sizeof(int16_t) * 2);
+		/*         For Sound              */
+		int SamplesPerSecond = 48000;
+		uint32_t RunningSampleIndex = 0;
+
+		//Near Note MIDDLE C LOl
+		int ToneHz = 256;
+		int SquareWaveCounter = 0;
+		int SquareWavePeriod = SamplesPerSecond / ToneHz;
+		int HalfSquareWavePeriod = SquareWavePeriod / 2;
+		int BytesPerSample = sizeof(int16_t) * 2;
+		int SecondaryBufferSize = SamplesPerSecond * BytesPerSample;
+		int ToneVolume = 250;
+
+		
+		//Initialize our Secondary Buffer 
+		InitDSound(Window, SamplesPerSecond, SamplesPerSecond * BytesPerSample);
+
+		//Play our Buffer
+		SecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+		/*         For Sound              */
+
+
+		HDC DeviceContext = GetDC(Window);
 
 		while (Running) {
 
@@ -419,6 +443,7 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 
 			}
 
+			/*        Remote Controller      */
 			for (DWORD ControllerIndex = 0; ControllerIndex < XUSER_MAX_COUNT; ++ControllerIndex) {
 				XINPUT_STATE ControllerState;
 				if (XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS) {
@@ -450,8 +475,73 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 
 				}
 			}
+			/*        Remote Controller      */
 
 			RenderGradient(&BackBuffer, xOffset, yOffset);
+
+
+
+			/*         For Sound           */
+			DWORD PlayCursor;
+			DWORD WriteCursor;
+			if (SUCCEEDED(SecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor))) {
+				
+				DWORD ByteToLock = RunningSampleIndex * BytesPerSample % SecondaryBufferSize;
+				DWORD BytesToWrite;
+				
+				//The Case when we have to do two chunks i.e. chunk after BytesToLock and 
+				//the chunk before PlayCursor
+				if (ByteToLock > PlayCursor) {
+					BytesToWrite = (SecondaryBufferSize - ByteToLock);
+					BytesToWrite += PlayCursor;
+				}
+				//When only one chunk is to be filled
+				else {
+					BytesToWrite = PlayCursor - ByteToLock;
+				}
+
+				//INIT
+				DWORD WritePointer;
+
+				void *Region1;
+				DWORD Region1Size;
+				void *Region2;
+				DWORD Region2Size;
+				
+
+				//URGENT Run function
+				//SecondaryBuffer->Lock()
+				if (SUCCEEDED(SecondaryBuffer->Lock(ByteToLock, BytesToWrite, &Region1, &Region1Size, &Region2, &Region2Size, 0))) {
+					//TODO assert that RegionSizes are valid
+
+
+					/*         Region 1                 */
+					int16_t *SampleOut = (int16_t *)Region1;
+					DWORD Region1SampleCount = Region1Size / BytesPerSample;
+
+					for (DWORD SampleIndex = 0; SampleIndex < Region1SampleCount; ++SampleIndex) {
+						
+						int16_t SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+						*SampleOut++ = SampleValue;
+						*SampleOut++ = SampleValue;
+					}
+					
+					/*            Region 2              */
+					SampleOut = (int16_t *)Region2;
+					DWORD Region2SampleCount = Region2Size / BytesPerSample;
+
+					for (DWORD SampleIndex = 0; SampleIndex < Region2SampleCount; ++SampleIndex) {
+						
+						int16_t SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+						*SampleOut++ = SampleValue;
+						*SampleOut++ = SampleValue;
+					}
+
+					//SecondaryBuffer->Unlock(Region1, Region1Size, Region2, Region2Size);
+				}
+
+			}
+			/*         For Sound           */
 
 
 			WindowDimension Dimension = GetWinDimension(Window);
