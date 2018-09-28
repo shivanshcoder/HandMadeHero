@@ -222,7 +222,7 @@ void InitSound_Output(Sound_Output *SoundOutput) {
 
 	SoundOutput->BytesPerSample = sizeof(int16_t) * 2;
 	SoundOutput->SecondaryBufferSize = SoundOutput->SamplesPerSecond * SoundOutput->BytesPerSample;
-	SoundOutput->ToneVolume = 6000;
+	SoundOutput->ToneVolume = 3000;
 
 }
 
@@ -359,7 +359,7 @@ static void FillSoundBuffer(Sound_Output *SoundOutput, DWORD ByteToLock, DWORD B
 			++SoundOutput->RunningSampleIndex;
 		}
 
-		//SecondaryBuffer->Unlock(Region1, Region1Size, Region2, Region2Size);
+		SecondaryBuffer->Unlock(Region1, Region1Size, Region2, Region2Size);
 	}
 
 }
@@ -566,21 +566,21 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 				DWORD BytesToWrite;
 				DWORD BytesToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize;
 				
-				//NOTE More accurate check for ByteToLock == PlayCursor
-				if (BytesToLock == PlayCursor) {
-					//if (!SoundIsPlaying)
-						//BytesToWrite = SoundOutput.SecondaryBufferSize;
-					//else
-						BytesToWrite = 0;
-				}
+				////NOTE More accurate check for ByteToLock == PlayCursor
+				//if (BytesToLock == PlayCursor) {
+				//	//if (!SoundIsPlaying)
+				//		//BytesToWrite = SoundOutput.SecondaryBufferSize;
+				//	//else
+				//		BytesToWrite = 0;
+				//}
 
 				//The Case when we have to do two chunks i.e. chunk after BytesToLock and 
 				//the chunk before PlayCursor
-				else if (BytesToLock > PlayCursor) {
+				if (BytesToLock > PlayCursor) {
 					BytesToWrite = (SoundOutput.SecondaryBufferSize - BytesToLock);
 					BytesToWrite += PlayCursor;
 				}
-				//When only one chunk is to be filled
+				//When only one chunk is to be filled	
 				else {
 					BytesToWrite = PlayCursor - BytesToLock;
 				}
@@ -589,7 +589,6 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 			}
 
 			/*         For Sound           */
-
 
 			Window_Dimension Dimension = GetWinDimension(Window);
 
