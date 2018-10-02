@@ -3,6 +3,7 @@
 #include<Xinput.h>
 #include<dsound.h>
 #include<math.h>
+#include<stdio.h>
 
 float const Pi = 3.14159265359;
 
@@ -324,8 +325,6 @@ static void FillSoundBuffer(Sound_Output *SoundOutput, DWORD ByteToLock, DWORD B
 	DWORD Region2Size;
 
 
-	//URGENT Run function
-	//SecondaryBuffer->Lock()
 	if (SUCCEEDED(SecondaryBuffer->Lock(ByteToLock, BytesToWrite, &Region1, &Region1Size, &Region2, &Region2Size, 0))) {
 		//TODO assert that RegionSizes are valid
 
@@ -439,7 +438,7 @@ LRESULT CALLBACK MainProc (HWND Window, UINT Message, WPARAM wParam, LPARAM lPar
 
 			case VK_ESCAPE: {
 				if (IsDown)
-					OutputDebugStringA ("Escape is down\n");;
+					OutputDebugStringA ("Escape is down\n");
 				if (WasDown)
 					OutputDebugStringA ("Escape was down\n");
 			}break;
@@ -485,6 +484,12 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 	HWND Window = CreateWindowExA (0, WindowClass.lpszClassName, "HandMadeHero", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, Instance, 0);
 	
+	LARGE_INTEGER PerfCountFrequencyRes;
+	QueryPerformanceFrequency(&PerfCountFrequencyRes);
+	int64_t PerfCountFrequency = PerfCountFrequencyRes.QuadPart;
+
+	int64_t LastCycleCount = __rdtsc();
+
 	if (Window) {
 		//For Quitting
 		Running = true;
@@ -508,7 +513,11 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 
 		HDC DeviceContext = GetDC(Window);
 
+		LARGE_INTEGER LastCounter;
+		QueryPerformanceCounter(&LastCounter);
+
 		while (Running) {
+
 
 			MSG Message;
 
@@ -597,6 +606,29 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 			xOffset++;
 			yOffset++;
 
+			int64_t EndCycleCount = __rdtsc();
+
+
+			LARGE_INTEGER EndCounter;
+			QueryPerformanceCounter(&EndCounter);
+
+			float CyclesElapsed = EndCycleCount - LastCycleCount;
+
+			int64_t CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
+			float MiliSecsPerFrame = ((1000 * CounterElapsed) / PerfCountFrequency);
+			float fps = PerfCountFrequency / CounterElapsed;
+			char buffer[256];
+			sprintf(buffer, "Millisecods per Frame : %f\n", MiliSecsPerFrame);
+			OutputDebugStringA(buffer);
+			sprintf(buffer, "FPS : %f\n", fps);
+			OutputDebugStringA(buffer);
+
+			//Mega cycles per frame
+			sprintf(buffer, "Cycles per frame : %f\n", CyclesElapsed/(1000*1000));
+			OutputDebugStringA(buffer);
+
+			LastCounter = EndCounter;
+			LastCycleCount = EndCycleCount;
 		}
 	}
 	else {
