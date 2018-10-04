@@ -66,7 +66,7 @@ static void RenderGradient(Offscreen_Buffer *Buffer, int xOffset, int yOffset) {
 			*/
 			uint8_t Blue = x + xOffset;
 			uint8_t Green = y + yOffset;
-			uint8_t Red = 255;//(x + y + xOffset+yOffset) % 255;
+			uint8_t Red = 0;//(x + y + xOffset+yOffset) % 255;
 
 			/*
 
@@ -223,7 +223,7 @@ void InitSound_Output(Sound_Output *SoundOutput) {
 
 	SoundOutput->BytesPerSample = sizeof(int16_t) * 2;
 	SoundOutput->SecondaryBufferSize = SoundOutput->SamplesPerSecond * SoundOutput->BytesPerSample;
-	SoundOutput->ToneVolume = 3000;
+	SoundOutput->ToneVolume = 10000;
 
 }
 
@@ -486,7 +486,7 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 	
 	LARGE_INTEGER PerfCountFrequencyRes;
 	QueryPerformanceFrequency(&PerfCountFrequencyRes);
-	int64_t PerfCountFrequency = PerfCountFrequencyRes.QuadPart;
+	uint64_t PerfCountFrequency = PerfCountFrequencyRes.QuadPart;
 
 	int64_t LastCycleCount = __rdtsc();
 
@@ -606,13 +606,13 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 			xOffset++;
 			yOffset++;
 
-			int64_t EndCycleCount = __rdtsc();
+			uint64_t EndCycleCount = __rdtsc();
 
 
 			LARGE_INTEGER EndCounter;
 			QueryPerformanceCounter(&EndCounter);
 
-			float CyclesElapsed = EndCycleCount - LastCycleCount;
+			uint64_t CyclesElapsed = EndCycleCount - LastCycleCount;
 
 			int64_t CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
 			float MiliSecsPerFrame = ((1000 * CounterElapsed) / PerfCountFrequency);
@@ -624,7 +624,7 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 			OutputDebugStringA(buffer);
 
 			//Mega cycles per frame
-			sprintf(buffer, "Cycles per frame : %f\n", CyclesElapsed/(1000*1000));
+			sprintf(buffer, "Cycles per frame : %f\n", (float)CyclesElapsed/(1000*1000));
 			OutputDebugStringA(buffer);
 
 			LastCounter = EndCounter;
