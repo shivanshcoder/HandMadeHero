@@ -1,9 +1,7 @@
-#include<Windows.h>
+
 #include<stdint.h>
-#include<Xinput.h>
-#include<dsound.h>
 #include<math.h>
-#include<stdio.h>
+
 
 float const Pi = 3.14159265359;
 
@@ -14,14 +12,19 @@ global_variable bool Running;
 
 #include"handmade.cpp"
 
+#include<windows.h>
+#include<Xinput.h>
+#include<dsound.h>
+#include<stdio.h>
+
 #pragma region __SCREENBUFFER
 
-struct Window_Dimension {
+struct win32_Window_Dimension {
 	int Width;
 	int Height;
 };
 
-struct Offscreen_Buffer {
+struct win32_Offscreen_Buffer {
 	BITMAPINFO Info;
 	void *Memory;
 	int Width;
@@ -31,10 +34,10 @@ struct Offscreen_Buffer {
 };
 
 
-static Offscreen_Buffer BackBuffer;
+static win32_Offscreen_Buffer BackBuffer;
 
-Window_Dimension GetWinDimension(HWND Window) {
-	Window_Dimension Result;
+win32_Window_Dimension win32_GetWinDimension(HWND Window) {
+	win32_Window_Dimension Result;
 	RECT ClientRect;
 	GetClientRect(Window, &ClientRect);
 	Result.Width = ClientRect.right - ClientRect.left;
@@ -43,7 +46,7 @@ Window_Dimension GetWinDimension(HWND Window) {
 	return Result;
 }
 
-static void RenderGradient(Offscreen_Buffer *Buffer, int xOffset, int yOffset) {
+static void win32_RenderGradient(win32_Offscreen_Buffer *Buffer, int xOffset, int yOffset) {
 	Buffer->Pitch = Buffer->Width * Buffer->BytesPerPixel;
 
 	uint8_t *Row = (uint8_t *)Buffer->Memory;
@@ -103,7 +106,7 @@ static void RenderGradient(Offscreen_Buffer *Buffer, int xOffset, int yOffset) {
 /*
 	Resizes and Initilizes the Information for our Back Bitmap Buffer
 */
-static void WinResizeDIBSection(Offscreen_Buffer *Buffer, int Width, int Height) {
+static void win32_WinResizeDIBSection(win32_Offscreen_Buffer *Buffer, int Width, int Height) {
 
 
 	//Free the Memory if already allocated
@@ -135,7 +138,7 @@ static void WinResizeDIBSection(Offscreen_Buffer *Buffer, int Width, int Height)
 
 }
 
-void UpdateWin(Offscreen_Buffer *Buffer, HDC DeviceContext, int WindowWidth, int WindowHeight, int X, int Y/*, int Width, int Height*/) {
+void win32_UpdateWin(win32_Offscreen_Buffer *Buffer, HDC DeviceContext, int WindowWidth, int WindowHeight, int X, int Y/*, int Width, int Height*/) {
 
 	StretchDIBits(DeviceContext,
 
@@ -205,7 +208,7 @@ void Win32LoadXInput(void) {
 
 global_variable LPDIRECTSOUNDBUFFER SecondaryBuffer;
 
-struct Sound_Output {
+struct win32_Sound_Output {
 	int SamplesPerSecond;
 	uint32_t RunningSampleIndex;
 	int ToneHz;
@@ -215,7 +218,7 @@ struct Sound_Output {
 	int ToneVolume;
 };
 
-void InitSound_Output(Sound_Output *SoundOutput) {
+void win32_InitSound_Output(win32_Sound_Output *SoundOutput) {
 	SoundOutput->SamplesPerSecond = 48000;
 	SoundOutput->RunningSampleIndex = 0;
 
@@ -320,7 +323,7 @@ static void InitDSound(HWND Window, int32_t SamplesPerSecond, int32_t BufferSize
 	// Start playing it
 }
 
-static void FillSoundBuffer(Sound_Output *SoundOutput, DWORD ByteToLock, DWORD BytesToWrite) {
+static void win32_FillSoundBuffer(win32_Sound_Output *SoundOutput, DWORD ByteToLock, DWORD BytesToWrite) {
 	void *Region1;
 	DWORD Region1Size;
 	void *Region2;
@@ -383,8 +386,8 @@ LRESULT CALLBACK MainProc (HWND Window, UINT Message, WPARAM wParam, LPARAM lPar
 		int Height = Paint.rcPaint.bottom - Y;
 
 
-		Window_Dimension Dimension = GetWinDimension (Window);
-		UpdateWin (&BackBuffer, DeviceContext, Dimension.Width, Dimension.Height, X, Y/*, Width, Height*/);
+		win32_Window_Dimension Dimension = win32_GetWinDimension (Window);
+		win32_UpdateWin (&BackBuffer, DeviceContext, Dimension.Width, Dimension.Height, X, Y/*, Width, Height*/);
 
 		EndPaint (Window, &Paint);
 
@@ -474,7 +477,7 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 	
 	WNDCLASSA WindowClass = {};
 
-	WinResizeDIBSection (&BackBuffer, 1280, 720);
+	win32_WinResizeDIBSection (&BackBuffer, 1280, 720);
 
 	WindowClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;;
 	WindowClass.lpfnWndProc = MainProc;
@@ -502,12 +505,12 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 
 
 		/*         For Sound              */
-		Sound_Output SoundOutput;
-		InitSound_Output(&SoundOutput);
+		win32_Sound_Output SoundOutput;
+		win32_InitSound_Output(&SoundOutput);
 		
 		//Initialize our Secondary Buffer 
 		InitDSound(Window, SoundOutput.SamplesPerSecond, SoundOutput.SecondaryBufferSize);
-		FillSoundBuffer(&SoundOutput, 0, SoundOutput.SecondaryBufferSize);
+		win32_FillSoundBuffer(&SoundOutput, 0, SoundOutput.SecondaryBufferSize);
 		SecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 		//bool SoundIsPlaying = false;
 		/*         For Sound              */
@@ -566,8 +569,14 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 			}
 			/*        Remote Controller      */
 
-			RenderGradient(&BackBuffer, xOffset, yOffset);
-
+			//RenderGradient(&BackBuffer, xOffset, yOffset);
+			game_offscreen_buffer buffer = {};
+			buffer.Memory = BackBuffer.Memory;
+			buffer.Width = BackBuffer.Width;
+			buffer.Height = BackBuffer.Height;
+			buffer.Pitch = BackBuffer.Pitch;
+			
+			GameUpdateAndRender(&buffer);
 
 			/*         For Sound           */
 			DWORD PlayCursor;
@@ -589,15 +598,15 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 				else {
 					BytesToWrite = PlayCursor - BytesToLock;
 				}
-				FillSoundBuffer(&SoundOutput, BytesToLock, BytesToWrite);
+				win32_FillSoundBuffer(&SoundOutput, BytesToLock, BytesToWrite);
 				
 			}
 
 			/*         For Sound           */
 
-			Window_Dimension Dimension = GetWinDimension(Window);
+			win32_Window_Dimension Dimension = win32_GetWinDimension(Window);
 
-			UpdateWin(&BackBuffer, DeviceContext, Dimension.Width, Dimension.Height, 0, 0/*,Dimension.Width,Dimension.Height*/);
+			win32_UpdateWin(&BackBuffer, DeviceContext, Dimension.Width, Dimension.Height, 0, 0/*,Dimension.Width,Dimension.Height*/);
 			//ReleaseDC (Window, DeviceContext);
 			xOffset++;
 			yOffset++;
