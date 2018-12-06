@@ -1,6 +1,7 @@
 
 #include<stdint.h>
 #include<math.h>
+#include<malloc.h>
 
 
 #define global_variable static
@@ -239,7 +240,6 @@ void win32_InitSound_Output(win32_Sound_Output *SoundOutput) {
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPGUID lpGuid, LPDIRECTSOUND* ppDS, LPUNKNOWN  pUnkOuter)
 
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
-
 
 
 static void InitDSound(HWND Window, int32_t SamplesPerSecond, int32_t BufferSize) {
@@ -505,22 +505,22 @@ LRESULT CALLBACK MainProc (HWND Window, UINT Message, WPARAM wParam, LPARAM lPar
 }
 
 
-int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, int CmdShow) {
-	
+int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, int CmdShow) {
+
 	WNDCLASSA WindowClass = {};
 
-	win32_WinResizeDIBSection (&BackBuffer, 1280, 720);
+	win32_WinResizeDIBSection(&BackBuffer, 1280, 720);
 
 	WindowClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;;
 	WindowClass.lpfnWndProc = MainProc;
 	WindowClass.hInstance = Instance;
 	WindowClass.lpszClassName = "HandMadeHero";
-	
-	RegisterClassA (&WindowClass);
 
-	HWND Window = CreateWindowExA (0, WindowClass.lpszClassName, "HandMadeHero", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+	RegisterClassA(&WindowClass);
+
+	HWND Window = CreateWindowExA(0, WindowClass.lpszClassName, "HandMadeHero", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, Instance, 0);
-	
+
 	LARGE_INTEGER PerfCountFrequencyRes;
 	QueryPerformanceFrequency(&PerfCountFrequencyRes);
 	uint64_t PerfCountFrequency = PerfCountFrequencyRes.QuadPart;
@@ -539,14 +539,16 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 		/*         For Sound              */
 		win32_Sound_Output SoundOutput;
 		win32_InitSound_Output(&SoundOutput);
-		
+
 		//Initialize our Secondary Buffer 
 		InitDSound(Window, SoundOutput.SamplesPerSecond, SoundOutput.SecondaryBufferSize);
+
+		int16_t *Samples = (int16_t*)VirtualAlloc(0, SoundOutput.SecondaryBufferSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 		//
 		win32_ClearSoundBuffer(&SoundOutput);
 		//win32_FillSoundBuffer(&SoundOutput, 0, SoundOutput.SecondaryBufferSize);
-		
+
 		//SecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 		//bool SoundIsPlaying = false;
 		/*         For Sound              */
@@ -607,21 +609,27 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 			}
 			/*        Remote Controller      */
 
-			//RenderGradient(&BackBuffer, xOffset, yOffset);
 			DWORD BytesToWrite = 0;
+
+			//The starting position of the lock
 			DWORD BytesToLock;
+
 			DWORD PlayCursor;
 			DWORD WriteCursor;
 
 			bool SoundIsValid = false;
 
-			if (SUCCEEDED(SecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor))) {
 
+			if (SUCCEEDED(SecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor))) {
+				SoundIsValid = true;
+
+				//Number of bytes we can lock/fill
 				BytesToLock = ((SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize);
-				
+
+				//Number of bytes we wish to fill
 				DWORD TargetCursor;
 				TargetCursor = ((PlayCursor + (SoundOutput.LatencySampleCount*SoundOutput.BytesPerSample)) % SoundOutput.SecondaryBufferSize);
-			
+
 				//The Case when we have to do two chunks i.e. chunk after BytesToLock and 
 				//the chunk before PlayCursor
 				if (BytesToLock > TargetCursor) {
@@ -632,10 +640,10 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 				else {
 					BytesToWrite = TargetCursor - BytesToLock;
 				}
-				SoundIsValid = true;
+				//SoundIsValid = true;
 			}
 
-			int16_t Samples[(48000)* 2];
+			
 			game_Sound_Output_Buffer SoundBuffer = {};
 			SoundBuffer.SamplesPerSecond = SoundOutput.SamplesPerSecond;
 			SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
@@ -647,16 +655,19 @@ int CALLBACK WinMain (HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine,
 			buffer.Width = BackBuffer.Width;
 			buffer.Height = BackBuffer.Height;
 			buffer.Pitch = BackBuffer.Pitch;
-			
-			GameUpdateAndRender(&buffer,&SoundBuffer);
+
+			GameUpdateAndRender(&buffer, &SoundBuffer);
+
+
+
 
 			/*         For Sound           */
-			
-			if ( SoundIsValid ) {
-				
-				win32_FillSoundBuffer(&SoundOutput, BytesToLock, BytesToWrite,&SoundBuffer);
-				
-			}
+
+			//if ( SoundIsValid ) {
+
+			win32_FillSoundBuffer(&SoundOutput, BytesToLock, BytesToWrite, &SoundBuffer);
+
+			//}
 			if (!SoundPlay) {
 				SecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 				SoundPlay = true;
