@@ -1,9 +1,11 @@
 
 
 #include"handmade.h"
+#include<math.h>
 
+//static float const Pi = 3.14159265359;
 
-static void RenderWeirdGradient(game_offscreen_buffer *Buffer, int BlueOffset, int GreenOffset) {
+static void RenderWeirdGradient(game_Offscreen_Buffer *Buffer, int BlueOffset, int GreenOffset) {
 	Buffer->Pitch = Buffer->Width * Buffer->BytesPerPixel;
 	uint8_t *Row = (uint8_t *)Buffer->Memory;
 
@@ -58,9 +60,34 @@ static void RenderWeirdGradient(game_offscreen_buffer *Buffer, int BlueOffset, i
 	}
 }
 
+static void GameOutputSound(game_Sound_Output_Buffer *SoundBuffer) {
+	static float tSine = 0;
+	int16_t ToneVolume = 3000;
+	int ToneHz = 256;
+	int WavePeriod = SoundBuffer->SamplesPerSecond / ToneHz;
 
-static void GameUpdateAndRender(game_offscreen_buffer *Buffer) {
+	int16_t *SampleOut = SoundBuffer->Samples;
+	//DWORD Region1SampleCount = Region1Size / SoundOutput->BytesPerSample;
+
+	for (int SampleIndex = 0; SampleIndex < SoundBuffer->SampleCount; ++SampleIndex) {
+
+		//float t = 2 * Pi * (float)SoundOutput->RunningSampleIndex / (float)SoundOutput->SquareWavePeriod;
+		float SineValue = sinf(tSine);
+		int16_t SampleValue = (int16_t)(SineValue * ToneVolume);;
+		*SampleOut++ = SampleValue;
+		*SampleOut++ = SampleValue;
+
+		tSine += 2 * Pi * 1.0f / (float)WavePeriod;
+	}
+
+}
+
+static void GameUpdateAndRender(game_Offscreen_Buffer *Buffer, game_Sound_Output_Buffer *SoundBuffer) {
 	int BlueOffset = 0;
 	int GreenOffset = 0;
+
+	//NOTE Allow sample offsets for more robust platform options
+	GameOutputSound(SoundBuffer);
+
 	RenderWeirdGradient(Buffer, BlueOffset, GreenOffset);
 }
